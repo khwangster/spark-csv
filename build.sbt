@@ -4,7 +4,7 @@ version := "1.3.0-SNAPSHOT"
 
 organization := "com.databricks"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.10.5"
 
 spName := "databricks/spark-csv"
 
