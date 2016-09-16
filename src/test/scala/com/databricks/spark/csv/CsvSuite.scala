@@ -17,27 +17,38 @@ package com.databricks.spark.csv
 
 import java.io.File
 import java.nio.charset.UnsupportedCharsetException
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
+import java.text.SimpleDateFormat
+import scala.io.Source
 
 import com.databricks.spark.csv.util.ParseModes
 import org.apache.hadoop.io.compress.GzipCodec
-import org.apache.spark.sql.{SQLContext, Row}
+import org.apache.spark.sql.{SQLContext, Row, SaveMode}
 import org.apache.spark.{SparkContext, SparkException}
 import org.apache.spark.sql.types._
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
+import org.scalatest.Matchers._
 
 abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
   val carsFile = "src/test/resources/cars.csv"
+  val carsMalformedFile = "src/test/resources/cars-malformed.csv"
   val carsFile8859 = "src/test/resources/cars_iso-8859-1.csv"
   val carsTsvFile = "src/test/resources/cars.tsv"
   val carsAltFile = "src/test/resources/cars-alternative.csv"
+  val carsUnbalancedQuotesFile = "src/test/resources/cars-unbalanced-quotes.csv"
   val nullNumbersFile = "src/test/resources/null-numbers.csv"
+  val nullNullNumbersFile = "src/test/resources/null_null_numbers.csv"
+  val nullSlashNNumbersFile = "src/test/resources/null_slashn_numbers.csv"
   val emptyFile = "src/test/resources/empty.csv"
   val ageFile = "src/test/resources/ages.csv"
   val escapeFile = "src/test/resources/escape.csv"
   val tempEmptyDir = "target/test/empty/"
   val commentsFile = "src/test/resources/comments.csv"
   val disableCommentsFile = "src/test/resources/disable_comments.csv"
+  val boolFile = "src/test/resources/bool.csv"
+  val datesFile = "src/test/resources/dates.csv"
+  val longColsFile = "src/test/resources/long-cols.csv"
+  private val simpleDatasetFile = "src/test/resources/simple.csv"
 
   val numCars = 3
 
@@ -47,7 +58,7 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    sqlContext = new SQLContext(new SparkContext("local[2]", "AvroSuite"))
+    sqlContext = new SQLContext(new SparkContext("local[2]", "CsvSuite"))
   }
 
   override protected def afterAll(): Unit = {
@@ -95,6 +106,20 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
          |CREATE TEMPORARY TABLE carsTable
          |USING com.databricks.spark.csv
          |OPTIONS (path "$carsFile", header "true", parserLib "$parserLib")
+      """.stripMargin.replaceAll("\n", " "))
+
+    assert(sqlContext.sql("SELECT year FROM carsTable").collect().size === numCars)
+  }
+
+  test("DDL test with alias name") {
+    assume(org.apache.spark.SPARK_VERSION.take(3) >= "1.5",
+      "Datasource alias feature was added in Spark 1.5")
+
+    sqlContext.sql(
+      s"""
+         |CREATE TEMPORARY TABLE carsTsvTable
+         |USING csv
+         |OPTIONS (path "$carsTsvFile", header "true", delimiter "\t", parserLib "$parserLib")
       """.stripMargin.replaceAll("\n", " "))
 
     assert(sqlContext.sql("SELECT year FROM carsTable").collect().size === numCars)
@@ -154,6 +179,28 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(results.size === numCars - 1)
   }
 
+  test("DSL test for DROPMALFORMED parsing mode with pruned scan") {
+    val strictSchema = new StructType(
+      Array(
+        StructField("Name", StringType, true),
+        StructField("Age", IntegerType, true),
+        StructField("Height", DoubleType, true),
+        StructField("Born", TimestampType, true)
+      )
+    )
+
+    val results = new CsvParser()
+      .withSchema(strictSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withParseMode(ParseModes.DROP_MALFORMED_MODE)
+      .csvFile(sqlContext, ageFile)
+      .select("Name")
+      .collect().size
+
+    assert(results === 1)
+  }
+
   test("DSL test for FAILFAST parsing mode") {
     val parser = new CsvParser()
       .withParseMode(ParseModes.FAIL_FAST_MODE)
@@ -194,6 +241,15 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(agesCopy.collect.toSet == agesRows.toSet)
   }
 
+  test("DSL test for tokens more than the schema") {
+    val results = sqlContext
+      .csvFile(carsMalformedFile, parserLib = parserLib)
+      .select("year")
+      .collect()
+
+    assert(results.size === numCars)
+  }
+
   test("DSL test with alternative delimiter and quote") {
     val results = new CsvParser()
       .withDelimiter('|')
@@ -201,6 +257,19 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
       .withUseHeader(true)
       .withParserLib(parserLib)
       .csvFile(sqlContext, carsAltFile)
+      .select("year")
+      .collect()
+
+    assert(results.size === numCars)
+  }
+
+  test("DSL test with null quote character") {
+    val results = new CsvParser()
+      .withDelimiter(',')
+      .withQuoteChar(null)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .csvFile(sqlContext, carsUnbalancedQuotesFile)
       .select("year")
       .collect()
 
@@ -261,7 +330,6 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(sqlContext.sql("SELECT year FROM carsTable").collect().size === numCars)
   }
 
-
   test("DSL test with empty file and known schema") {
     val results = new CsvParser()
       .withSchema(StructType(List(StructField("column", StringType, false))))
@@ -278,7 +346,8 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
       Array(
         StructField("Name", StringType, true),
         StructField("Age", StringType, true),
-        StructField("Height", StringType, true)
+        StructField("Height", StringType, true),
+        StructField("Born", StringType, true)
       )
     )
 
@@ -290,14 +359,16 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
       .csvFile(sqlContext, ageFile)
       .count()
 
-    assert(results === 3)
+    assert(results === 4)
   }
+
   test("DSL test with poorly formatted file and known schema") {
     val strictSchema = new StructType(
       Array(
         StructField("Name", StringType, true),
         StructField("Age", IntegerType, true),
-        StructField("Height", DoubleType, true)
+        StructField("Height", DoubleType, true),
+        StructField("Born", TimestampType, true)
       )
     )
 
@@ -388,6 +459,116 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
   }
 
+  test("DSL save with a quoteMode") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
+    val delimiter = ","
+    var quote = "\""
+    cars.saveAsCsvFile(copyFilePath, Map("header" -> "true",
+      "quote" -> quote, "delimiter" -> delimiter, "quoteMode" -> "ALL"))
+
+    val carsCopy = sqlContext.csvFile(copyFilePath + "/")
+    for(file <- new File(copyFilePath + "/").listFiles) {
+      if (!(file.getName.startsWith("_") || file.getName.startsWith("."))) {
+        for(line <- Source.fromFile(file).getLines()) {
+          for(column <- line.split(delimiter)) {
+            assert(column.startsWith(quote))
+            assert(column.endsWith(quote))
+          }
+        }
+      }
+    }
+
+    assert(carsCopy.count == cars.count)
+    assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
+  }
+
+  test("DSL save with non numeric quoteMode") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib, inferSchema = true)
+    val delimiter = ","
+    var quote = "\""
+    cars.saveAsCsvFile(copyFilePath, Map("header" -> "true",
+      "quote" -> quote, "delimiter" -> delimiter, "quoteMode" -> "NON_NUMERIC"))
+
+    val carsCopy = sqlContext.csvFile(copyFilePath + "/")
+    for(file <- new File(copyFilePath + "/").listFiles) {
+      if (!(file.getName.startsWith("_") || file.getName.startsWith("."))) {
+        for((line, lineno) <- Source.fromFile(file).getLines().zipWithIndex) {
+          val columns = line.split(delimiter)
+          if (lineno == 0) {
+            assert(columns(0).startsWith(quote))
+            assert(columns(0).endsWith(quote))
+            assert(columns(1).startsWith(quote))
+            assert(columns(1).endsWith(quote))
+          } else {
+            assert(!columns(0).startsWith(quote))
+            assert(!columns(0).endsWith(quote))
+            assert(columns(1).startsWith(quote))
+            assert(columns(1).endsWith(quote))
+          }
+        }
+      }
+    }
+
+    assert(carsCopy.count == cars.count)
+    assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
+  }
+
+  test("DSL save with null quoteMode") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
+    val delimiter = ","
+    var quote = "\""
+    cars.saveAsCsvFile(copyFilePath, Map("header" -> "true",
+      "quote" -> quote, "delimiter" -> delimiter, "quoteMode" -> null))
+
+    val carsCopy = sqlContext.csvFile(copyFilePath + "/")
+    for(file <- new File(copyFilePath + "/").listFiles) {
+      if (!(file.getName.startsWith("_") || file.getName.startsWith("."))) {
+        for(line <- Source.fromFile(file).getLines()) {
+          for(column <- line.split(delimiter)) {
+            assert(!column.startsWith(quote))
+            assert(!column.endsWith(quote))
+          }
+        }
+      }
+    }
+
+    assert(carsCopy.count == cars.count)
+    assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
+  }
+
+  test("DSL checking non null escapeChar is set before NONE quoteMode") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
+    val delimiter = ","
+    var quote = "\""
+    var escape = "\\"
+    var quoteMode = "NONE"
+
+    noException should be thrownBy {
+      cars.saveAsCsvFile(copyFilePath, Map("header" -> "true", "quote" -> quote,
+        "delimiter" -> delimiter, "escape" -> escape, "quoteMode" -> quoteMode))
+    }
+  }
+
   test("DSL save with a compression codec") {
     // Create temp directory
     TestUtils.deleteRecursively(new File(tempEmptyDir))
@@ -396,6 +577,44 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
 
     val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
     cars.saveAsCsvFile(copyFilePath, Map("header" -> "true"), classOf[GzipCodec])
+
+    val carsCopy = sqlContext.csvFile(copyFilePath + "/")
+
+    assert(carsCopy.count == cars.count)
+    assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
+  }
+
+  test("Scala API save with gzip compression codec") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
+    cars.save("com.databricks.spark.csv", SaveMode.Overwrite,
+      Map("path" -> copyFilePath, "header" -> "true", "codec" -> classOf[GzipCodec].getName))
+    val carsCopyPartFile = new File(copyFilePath, "part-00000.gz")
+    // Check that the part file has a .gz extension
+    assert(carsCopyPartFile.exists())
+
+    val carsCopy = sqlContext.csvFile(copyFilePath + "/")
+
+    assert(carsCopy.count == cars.count)
+    assert(carsCopy.collect.map(_.toString).toSet == cars.collect.map(_.toString).toSet)
+  }
+
+  test("Scala API save with gzip compression codec by shorten name") {
+    // Create temp directory
+    TestUtils.deleteRecursively(new File(tempEmptyDir))
+    new File(tempEmptyDir).mkdirs()
+    val copyFilePath = tempEmptyDir + "cars-copy.csv"
+
+    val cars = sqlContext.csvFile(carsFile, parserLib = parserLib)
+    cars.save("com.databricks.spark.csv", SaveMode.Overwrite,
+      Map("path" -> copyFilePath, "header" -> "true", "codec" -> "gZiP"))
+    val carsCopyPartFile = new File(copyFilePath, "part-00000.gz")
+    // Check that the part file has a .gz extension
+    assert(carsCopyPartFile.exists())
 
     val carsCopy = sqlContext.csvFile(copyFilePath + "/")
 
@@ -453,6 +672,9 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     val results = sqlContext
       .csvFile(carsFile, parserLib = parserLib, inferSchema = true)
 
+    val boolResults = sqlContext
+      .csvFile(boolFile, parserLib = parserLib, inferSchema = true)
+
     assert(results.schema == StructType(List(
       StructField("year", IntegerType, nullable = true),
       StructField("make", StringType, nullable = true),
@@ -461,7 +683,13 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
       StructField("blank", StringType, nullable = true))
     ))
 
+    assert(boolResults.schema == StructType(List(
+      StructField("bool", BooleanType, nullable = true))
+    ))
+
     assert(results.collect().size === numCars)
+
+    assert(boolResults.collect().size === 3)
   }
 
   test("DSL test inferred schema passed through") {
@@ -503,6 +731,36 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(results(2).toSeq === Seq("", 24))
   }
 
+  test("DSL test nullable fields with user defined null value of \"null\"") {
+    val results = new CsvParser()
+      .withSchema(StructType(List(StructField("name", StringType, false),
+                                  StructField("age", IntegerType, true))))
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("null")
+      .csvFile(sqlContext, nullNullNumbersFile)
+      .collect()
+
+    assert(results.head.toSeq === Seq("alice", 35))
+    assert(results(1).toSeq === Seq("bob", null))
+    assert(results(2).toSeq === Seq("null", 24))
+  }
+
+  test("DSL test nullable fields with user defined null value of \"\\N\"") {
+    val results = new CsvParser()
+      .withSchema(StructType(List(StructField("name", StringType, false),
+                                  StructField("age", IntegerType, true))))
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("\\N")
+      .csvFile(sqlContext, nullSlashNNumbersFile)
+      .collect()
+
+    assert(results.head.toSeq === Seq("alice", 35))
+    assert(results(1).toSeq === Seq("bob", null))
+    assert(results(2).toSeq === Seq("\\N", 24))
+  }
+
   test("Commented lines in CSV data") {
     val results: Array[Row] = new CsvParser()
       .withDelimiter(',')
@@ -536,6 +794,53 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
     assert(results.toSeq.map(_.toSeq) === expected)
   }
 
+  test("Inferring timestamp types via custom date format") {
+    val results = new CsvParser()
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withDateFormat("dd/MM/yyyy hh:mm")
+      .withNullValue("?")
+      .withInferSchema(true)
+      .csvFile(sqlContext, datesFile)
+      .select("date")
+      .collect()
+
+    val dateFormatter = new SimpleDateFormat("dd/MM/yyyy hh:mm")
+    val expected =
+      Seq(Seq(new Timestamp(dateFormatter.parse("26/08/2015 18:00").getTime)),
+        Seq(new Timestamp(dateFormatter.parse("27/10/2014 18:30").getTime)),
+        Seq(null),
+        Seq(new Timestamp(dateFormatter.parse("28/01/2016 20:00").getTime)))
+    assert(results.toSeq.map(_.toSeq) === expected)
+  }
+
+  test("Load date types via custom date format") {
+    val customSchema = new StructType(Array(StructField("date", DateType, true)))
+    val results = new CsvParser()
+      .withSchema(customSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withDateFormat("dd/MM/yyyy hh:mm")
+      .withNullValue("?")
+      .csvFile(sqlContext, datesFile)
+      .select("date")
+      .collect()
+
+    val dateFormatter = new SimpleDateFormat("dd/MM/yyyy hh:mm")
+    val expected = Seq(
+      new Date(dateFormatter.parse("26/08/2015 18:00").getTime),
+      new Date(dateFormatter.parse("27/10/2014 18:30").getTime),
+      null,
+      new Date(dateFormatter.parse("28/01/2016 20:00").getTime))
+    val dates = results.toSeq.map(_.toSeq.head)
+    expected.zip(dates).foreach {
+      case (null, date) => assert(date == null)
+      case (expectedDate, date) =>
+        // As it truncates the hours, minutes and etc., we only check
+        // if the dates (days, months and years) are the same via `toString()`.
+        assert(expectedDate.toString === date.toString)
+    }
+  }
 
   test("Setting comment to null disables comment support") {
     val results: Array[Row] = new CsvParser()
@@ -551,6 +856,38 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
         Seq("4", "5", "6"))
 
     assert(results.toSeq.map(_.toSeq) === expected)
+  }
+
+  test("DSL allows for setting maxColsPerChar and expect error") {
+    val parser = new CsvParser()
+      .withDelimiter(',')
+      .withUseHeader(true)
+      .withParseMode(ParseModes.FAIL_FAST_MODE)
+      .withMaxCharsPerCol(5000)
+
+    val exception = intercept[SparkException]{
+      parser.csvFile(sqlContext, longColsFile)
+        .select("text")
+        .collect()
+    }
+
+    assert(exception.getMessage.contains("Malformed line in FAILFAST mode: 2,Bacon ipsum dolor amet dolore"))
+  }
+
+  test("DSL allows for setting maxColsPerChar and succeeds") {
+    val parser = new CsvParser()
+      .withDelimiter(',')
+      .withUseHeader(true)
+      .withMaxCharsPerCol(15000)
+
+    val res = parser.csvFile(sqlContext, longColsFile)
+      .collect()
+
+    assert(res.size === 3)
+    assert(res(0).toSeq === Seq("1", "bacon is yummy"))
+    assert(res(1).getAs[String](0) === "2")
+    assert(res(1).getAs[String](1).startsWith("Bacon ipsum dolor amet dolore"))
+    assert(res(2).toSeq === Seq("3", "pork is the best"))
   }
 
   test("DSL load csv from rdd") {
@@ -594,6 +931,17 @@ abstract class AbstractCsvSuite extends FunSuite with BeforeAndAfterAll {
       .collect()
 
     assert(results.size === numCars)
+  }
+
+  test("Type/Schema inference works as expected for the simple sparse dataset.") {
+    val df = new CsvParser()
+      .withUseHeader(true)
+      .withInferSchema(true)
+      .csvFile(sqlContext, simpleDatasetFile)
+
+    assert(
+      df.schema.fields.map(_.dataType).deep ==
+      Array(IntegerType, IntegerType, IntegerType, IntegerType).deep)
   }
 }
 

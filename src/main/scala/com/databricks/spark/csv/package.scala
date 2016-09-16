@@ -15,13 +15,20 @@
  */
 package com.databricks.spark
 
-import org.apache.commons.csv.CSVFormat
+import java.text.SimpleDateFormat
+import java.sql.{Timestamp, Date}
+
+import org.apache.commons.csv.{CSVFormat, QuoteMode}
 import org.apache.hadoop.io.compress.CompressionCodec
+import org.apache.spark.sql.types.{DateType, TimestampType}
 
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import com.databricks.spark.csv.util.TextFile
 
 package object csv {
+
+  val defaultCsvFormat =
+    CSVFormat.DEFAULT.withRecordSeparator(System.getProperty("line.separator", "\n"))
 
   /**
    * Adds a method, `csvFile`, to SQLContext that allows reading CSV data.
@@ -87,11 +94,18 @@ package object csv {
 
     /**
      * Saves DataFrame as csv files. By default uses ',' as delimiter, and includes header line.
+     * If compressionCodec is not null the resulting output will be compressed.
+     * Note that a codec entry in the parameters map will be ignored.
      */
     def saveAsCsvFile(path: String, parameters: Map[String, String] = Map(),
                       compressionCodec: Class[_ <: CompressionCodec] = null): Unit = {
       // TODO(hossein): For nested types, we may want to perform special work
       val delimiter = parameters.getOrElse("delimiter", ",")
+      // Before this change the csvFormatter wrote dates like this:
+      // "2014-11-15 06:31:10.0", so have that as the default.
+      val dateFormat = parameters.getOrElse("dateFormat", "yyyy-MM-dd HH:mm:ss.S")
+      val dateFormatter: SimpleDateFormat = new SimpleDateFormat(dateFormat)
+
       val delimiterChar = if (delimiter.length == 1) {
         delimiter.charAt(0)
       } else {
@@ -107,29 +121,31 @@ package object csv {
         throw new Exception("Escape character cannot be more than one character.")
       }
 
-      val quoteChar = parameters.get("quote") match {
-        case Some(s) => {
-          if (s.length == 1) {
-            Some(s.charAt(0))
-          } else {
-            throw new Exception("Quotation cannot be more than one character.")
-          }
-        }
-        case None => None
+      val quote = parameters.getOrElse("quote", "\"")
+      val quoteChar: Character = if (quote == null) {
+        null
+      } else if (quote.length == 1) {
+        quote.charAt(0)
+      } else {
+        throw new Exception("Quotation cannot be more than one character.")
+      }
+
+      val quoteModeString = parameters.getOrElse("quoteMode", "MINIMAL")
+      val quoteMode: QuoteMode = if (quoteModeString == null) {
+        null
+      } else {
+        QuoteMode.valueOf(quoteModeString.toUpperCase)
       }
 
       val nullValue = parameters.getOrElse("nullValue", "null")
 
-      val csvFormatBase = CSVFormat.DEFAULT
+      val csvFormat = defaultCsvFormat
         .withDelimiter(delimiterChar)
+        .withQuote(quoteChar)
         .withEscape(escapeChar)
+        .withQuoteMode(quoteMode)
         .withSkipHeaderRecord(false)
         .withNullString(nullValue)
-
-      val csvFormat = quoteChar match {
-        case Some(c) => csvFormatBase.withQuote(c)
-        case _ => csvFormatBase
-      }
 
       val generateHeader = parameters.getOrElse("header", "false").toBoolean
       val header = if (generateHeader) {
@@ -138,17 +154,31 @@ package object csv {
         "" // There is no need to generate header in this case
       }
 
+      // Create an index for the format by type so the type check
+      // does not have to happen in the inner loop.
+      val schema = dataFrame.schema
+      val formatForIdx = schema.fieldNames.map(fname => schema(fname).dataType match {
+        case TimestampType => (timestamp: Any) => {
+          if (timestamp == null) {
+            nullValue
+          } else {
+            dateFormatter.format(new Date(timestamp.asInstanceOf[Timestamp].getTime))
+          }
+        }
+        case DateType => (date: Any) => {
+          if (date == null) nullValue else dateFormatter.format(date)
+        }
+        case _ => (fieldValue: Any) => fieldValue.asInstanceOf[AnyRef]
+      })
+
       val strRDD = dataFrame.rdd.mapPartitionsWithIndex { case (index, iter) =>
-        val csvFormatBase = CSVFormat.DEFAULT
+        val csvFormat = defaultCsvFormat
           .withDelimiter(delimiterChar)
+          .withQuote(quoteChar)
           .withEscape(escapeChar)
+          .withQuoteMode(quoteMode)
           .withSkipHeaderRecord(false)
           .withNullString(nullValue)
-
-        val csvFormat = quoteChar match {
-          case Some(c) => csvFormatBase.withQuote(c)
-          case _ => csvFormatBase
-        }
 
         new Iterator[String] {
           var firstRow: Boolean = generateHeader
@@ -157,10 +187,14 @@ package object csv {
 
           override def next: String = {
             if (iter.nonEmpty) {
-              val row = csvFormat.format(iter.next().toSeq.map(_.asInstanceOf[AnyRef]): _*)
+              // try .zipWithIndex.foreach
+              val values: Seq[AnyRef] = iter.next().toSeq.zipWithIndex.map {
+                case (fieldVal, i) => formatForIdx(i)(fieldVal)
+              }
+              val row = csvFormat.format(values: _*)
               if (firstRow) {
                 firstRow = false
-                header + csvFormat.getRecordSeparator() + row
+                header + csvFormat.getRecordSeparator + row
               } else {
                 row
               }

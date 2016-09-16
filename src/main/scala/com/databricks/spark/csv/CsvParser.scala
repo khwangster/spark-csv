@@ -39,6 +39,10 @@ class CsvParser extends Serializable {
   private var parserLib: String = ParserLibs.DEFAULT
   private var charset: String = TextFile.DEFAULT_CHARSET.name()
   private var inferSchema: Boolean = false
+  private var codec: String = null
+  private var nullValue: String = ""
+  private var dateFormat: String = null
+  private var maxCharsPerCol: Int = 100000
 
   def withUseHeader(flag: Boolean): CsvParser = {
     this.useHeader = flag
@@ -105,6 +109,26 @@ class CsvParser extends Serializable {
     this
   }
 
+  def withCompression(codec: String): CsvParser = {
+    this.codec = codec
+    this
+  }
+
+  def withNullValue(nullValue: String): CsvParser = {
+    this.nullValue = nullValue
+    this
+  }
+
+  def withDateFormat(dateFormat: String): CsvParser = {
+    this.dateFormat = dateFormat
+    this
+  }
+
+  def withMaxCharsPerCol(maxCharsPerCol: Int): CsvParser = {
+    this.maxCharsPerCol = maxCharsPerCol
+    this
+  }
+
   /** Returns a Schema RDD for the given CSV path. */
   @throws[RuntimeException]
   def csvFile(sqlContext: SQLContext, path: String): DataFrame = {
@@ -122,7 +146,11 @@ class CsvParser extends Serializable {
       ignoreTrailingWhiteSpace,
       treatEmptyValuesAsNulls,
       schema,
-      inferSchema)(sqlContext)
+      inferSchema,
+      codec,
+      nullValue,
+      dateFormat,
+      maxCharsPerCol)(sqlContext)
     sqlContext.baseRelationToDataFrame(relation)
   }
 
@@ -141,7 +169,11 @@ class CsvParser extends Serializable {
       ignoreTrailingWhiteSpace,
       treatEmptyValuesAsNulls,
       schema,
-      inferSchema)(sqlContext)
+      inferSchema,
+      codec,
+      nullValue,
+      dateFormat,
+      maxCharsPerCol)(sqlContext)
     sqlContext.baseRelationToDataFrame(relation)
   }
 }

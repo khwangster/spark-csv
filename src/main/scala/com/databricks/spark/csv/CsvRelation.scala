@@ -16,6 +16,7 @@
 package com.databricks.spark.csv
 
 import java.io.IOException
+import java.text.SimpleDateFormat
 
 import scala.collection.JavaConversions._
 import scala.util.control.NonFatal
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.sources.{BaseRelation, InsertableRelation, TableScan}
+import org.apache.spark.sql.sources.{PrunedScan, BaseRelation, InsertableRelation, TableScan}
 import org.apache.spark.sql.types._
 import com.databricks.spark.csv.readers.{BulkCsvReader, LineCsvReader}
 import com.databricks.spark.csv.util._
@@ -36,7 +37,7 @@ case class CsvRelation protected[spark] (
     location: Option[String],
     useHeader: Boolean,
     delimiter: Char,
-    quote: Char,
+    quote: Character,
     escape: Character,
     comment: Character,
     parseMode: String,
@@ -45,13 +46,15 @@ case class CsvRelation protected[spark] (
     ignoreTrailingWhiteSpace: Boolean,
     treatEmptyValuesAsNulls: Boolean,
     userSchema: StructType = null,
-    inferCsvSchema: Boolean)(@transient val sqlContext: SQLContext)
-  extends BaseRelation with TableScan with InsertableRelation {
+    inferCsvSchema: Boolean,
+    codec: String = null,
+    nullValue: String = "",
+    dateFormat: String = null,
+    maxCharsPerCol: Int = 100000)(@transient val sqlContext: SQLContext)
+  extends BaseRelation with TableScan with PrunedScan with InsertableRelation {
 
-  /**
-   * Limit the number of lines we'll search for a header row that isn't comment-prefixed.
-   */
-  private val MAX_COMMENT_LINES_IN_HEADER = 10
+  // Share date format object as it is expensive to parse date pattern.
+  private val dateFormatter = if (dateFormat != null) new SimpleDateFormat(dateFormat) else null
 
   private val logger = LoggerFactory.getLogger(CsvRelation.getClass)
 
@@ -75,7 +78,7 @@ case class CsvRelation protected[spark] (
     if (ParserLibs.isUnivocityLib(parserLib)) {
       univocityParseCSV(baseRDD(), header)
     } else {
-      val csvFormat = CSVFormat.DEFAULT
+      val csvFormat = defaultCsvFormat
         .withDelimiter(delimiter)
         .withQuote(quote)
         .withEscape(escape)
@@ -99,23 +102,24 @@ case class CsvRelation protected[spark] (
   }
 
   override def buildScan: RDD[Row] = {
+    val simpleDateFormatter = dateFormatter
     val schemaFields = schema.fields
+    val rowArray = new Array[Any](schemaFields.length)
     tokenRdd(schemaFields.map(_.name)).flatMap { tokens =>
 
-      if (dropMalformed && schemaFields.length != tokens.size) {
+      if (dropMalformed && schemaFields.length != tokens.length) {
         logger.warn(s"Dropping malformed line: ${tokens.mkString(",")}")
         None
-      } else if (failFast && schemaFields.length != tokens.size) {
+      } else if (failFast && schemaFields.length != tokens.length) {
         throw new RuntimeException(s"Malformed line in FAILFAST mode: ${tokens.mkString(",")}")
       } else {
         var index: Int = 0
-        val rowArray = new Array[Any](schemaFields.length)
         try {
           index = 0
           while (index < schemaFields.length) {
             val field = schemaFields(index)
             rowArray(index) = TypeCast.castTo(tokens(index), field.dataType, field.nullable,
-              treatEmptyValuesAsNulls)
+              treatEmptyValuesAsNulls, nullValue, simpleDateFormatter)
             index = index + 1
           }
           Some(Row.fromSeq(rowArray))
@@ -123,14 +127,94 @@ case class CsvRelation protected[spark] (
           case aiob: ArrayIndexOutOfBoundsException if permissive =>
             (index until schemaFields.length).foreach(ind => rowArray(ind) = null)
             Some(Row.fromSeq(rowArray))
-          case nfe: java.lang.NumberFormatException if dropMalformed =>
+          case _: java.lang.NumberFormatException |
+               _: IllegalArgumentException if dropMalformed =>
             logger.warn("Number format exception. " +
-              s"Dropping malformed line: ${tokens.mkString(",")}")
+              s"Dropping malformed line: ${tokens.mkString(delimiter.toString)}")
             None
           case pe: java.text.ParseException if dropMalformed =>
-            logger.warn("Parse Exception. " +
-              s"Dropping malformed line: ${tokens.mkString(",")}")
+            logger.warn("Parse exception. " +
+              s"Dropping malformed line: ${tokens.mkString(delimiter.toString)}")
             None
+        }
+      }
+    }
+  }
+
+
+  /**
+   * This supports to eliminate unneeded columns before producing an RDD
+   * containing all of its tuples as Row objects. This reads all the tokens of each line
+   * and then drop unneeded tokens without casting and type-checking by mapping
+   * both the indices produced by `requiredColumns` and the ones of tokens.
+   */
+  override def buildScan(requiredColumns: Array[String]): RDD[Row] = {
+    val simpleDateFormatter = dateFormatter
+    val schemaFields = schema.fields
+    val requiredFields = StructType(requiredColumns.map(schema(_))).fields
+    val shouldTableScan = schemaFields.deep == requiredFields.deep
+    val safeRequiredFields = if (dropMalformed) {
+      // If `dropMalformed` is enabled, then it needs to parse all the values
+      // so that we can decide which row is malformed.
+      requiredFields ++ schemaFields.filterNot(requiredFields.contains(_))
+    } else {
+      requiredFields
+    }
+    val rowArray = new Array[Any](safeRequiredFields.length)
+    if (shouldTableScan) {
+      buildScan()
+    } else {
+      val safeRequiredIndices = new Array[Int](safeRequiredFields.length)
+      schemaFields.zipWithIndex.filter {
+        case (field, _) => safeRequiredFields.contains(field)
+      }.foreach {
+        case (field, index) => safeRequiredIndices(safeRequiredFields.indexOf(field)) = index
+      }
+      val requiredSize = requiredFields.length
+      tokenRdd(schemaFields.map(_.name)).flatMap { tokens =>
+
+        if (dropMalformed && schemaFields.length != tokens.length) {
+          logger.warn(s"Dropping malformed line: ${tokens.mkString(delimiter.toString)}")
+          None
+        } else if (failFast && schemaFields.length != tokens.length) {
+          throw new RuntimeException(s"Malformed line in FAILFAST mode: " +
+            s"${tokens.mkString(delimiter.toString)}")
+        } else {
+          val indexSafeTokens = if (permissive && schemaFields.length > tokens.length) {
+            tokens ++ new Array[String](schemaFields.length - tokens.length)
+          } else if (permissive && schemaFields.length < tokens.length) {
+            tokens.take(schemaFields.length)
+          } else {
+            tokens
+          }
+          try {
+            var index: Int = 0
+            var subIndex: Int = 0
+            while (subIndex < safeRequiredIndices.length) {
+              index = safeRequiredIndices(subIndex)
+              val field = schemaFields(index)
+              rowArray(subIndex) = TypeCast.castTo(
+                indexSafeTokens(index),
+                field.dataType,
+                field.nullable,
+                treatEmptyValuesAsNulls,
+                nullValue,
+                simpleDateFormatter
+              )
+              subIndex = subIndex + 1
+            }
+            Some(Row.fromSeq(rowArray.take(requiredSize)))
+          } catch {
+            case _: java.lang.NumberFormatException |
+                 _: IllegalArgumentException if dropMalformed =>
+              logger.warn("Number format exception. " +
+                s"Dropping malformed line: ${tokens.mkString(delimiter.toString)}")
+              None
+            case pe: java.text.ParseException if dropMalformed =>
+              logger.warn("Parse exception. " +
+                s"Dropping malformed line: ${tokens.mkString(delimiter.toString)}")
+              None
+          }
         }
       }
     }
@@ -143,10 +227,14 @@ case class CsvRelation protected[spark] (
       val firstRow = if (ParserLibs.isUnivocityLib(parserLib)) {
         val escapeVal = if (escape == null) '\\' else escape.charValue()
         val commentChar: Char = if (comment == null) '\0' else comment
-        new LineCsvReader(fieldSep = delimiter, quote = quote, escape = escapeVal,
+        val quoteChar: Char = if (quote == null) '\0' else quote
+        new LineCsvReader(
+          fieldSep = delimiter,
+          quote = quoteChar,
+          escape = escapeVal,
           commentMarker = commentChar).parseLine(firstLine)
       } else {
-        val csvFormat = CSVFormat.DEFAULT
+        val csvFormat = defaultCsvFormat
           .withDelimiter(delimiter)
           .withQuote(quote)
           .withEscape(escape)
@@ -159,7 +247,8 @@ case class CsvRelation protected[spark] (
         firstRow.zipWithIndex.map { case (value, index) => s"C$index"}
       }
       if (this.inferCsvSchema) {
-        InferSchema(tokenRdd(header), header)
+        val simpleDateFormatter = dateFormatter
+        InferSchema(tokenRdd(header), header, nullValue, simpleDateFormatter)
       } else {
         // By default fields are assumed to be StringType
         val schemaFields = header.map { fieldName =>
@@ -174,13 +263,14 @@ case class CsvRelation protected[spark] (
    * Returns the first line of the first non-empty file in path
    */
   private lazy val firstLine = {
-    if (comment == null) {
-      baseRDD().first()
+    if (comment != null) {
+      baseRDD().filter { line =>
+        line.trim.nonEmpty && !line.startsWith(comment.toString)
+      }.first()
     } else {
-      baseRDD().take(MAX_COMMENT_LINES_IN_HEADER)
-        .find(! _.startsWith(comment.toString))
-        .getOrElse(sys.error(s"No uncommented header line in " +
-          s"first $MAX_COMMENT_LINES_IN_HEADER lines"))
+      baseRDD().filter { line =>
+        line.trim.nonEmpty
+      }.first()
     }
   }
 
@@ -194,10 +284,12 @@ case class CsvRelation protected[spark] (
       case (split, iter) => {
         val escapeVal = if (escape == null) '\\' else escape.charValue()
         val commentChar: Char = if (comment == null) '\0' else comment
+        val quoteChar: Char = if (quote == null) '\0' else quote
 
         new BulkCsvReader(iter, split,
           headers = header, fieldSep = delimiter,
-          quote = quote, escape = escapeVal, commentMarker = commentChar)
+          quote = quoteChar, escape = escapeVal,
+          commentMarker = commentChar, maxCharsPerCol = maxCharsPerCol)
       }
     }, true)
 
@@ -245,7 +337,10 @@ case class CsvRelation protected[spark] (
               + s" to INSERT OVERWRITE a CSV table:\n${e.toString}")
       }
       // Write the data. We assume that schema isn't changed, and we won't update it.
-      data.saveAsCsvFile(filesystemPath.toString, Map("delimiter" -> delimiter.toString))
+
+      val codecClass = CompressionCodecs.getCodecClass(codec)
+      data.saveAsCsvFile(filesystemPath.toString, Map("delimiter" -> delimiter.toString),
+        codecClass)
     } else {
       sys.error("CSV tables only support INSERT OVERWRITE for now.")
     }

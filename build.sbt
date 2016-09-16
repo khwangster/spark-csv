@@ -1,6 +1,6 @@
 name := "spark-csv"
 
-version := "1.3.0-SNAPSHOT"
+version := "1.5.0"
 
 organization := "com.databricks"
 
@@ -10,7 +10,7 @@ spName := "databricks/spark-csv"
 
 crossScalaVersions := Seq("2.10.5", "2.11.7")
 
-sparkVersion := "1.5.0"
+sparkVersion := "1.6.0"
 
 val testSparkVersion = settingKey[String]("The version of Spark to test against.")
 
@@ -54,7 +54,7 @@ pomExtra := (
   <url>https://github.com/databricks/spark-csv</url>
   <licenses>
     <license>
-      <name>Apache License, Verision 2.0</name>
+      <name>Apache License, Version 2.0</name>
       <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
       <distribution>repo</distribution>
     </license>

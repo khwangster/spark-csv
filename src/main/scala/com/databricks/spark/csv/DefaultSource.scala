@@ -19,14 +19,16 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.{DataFrame, SaveMode, SQLContext}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
-import com.databricks.spark.csv.util.{ParserLibs, TextFile, TypeCast}
+import com.databricks.spark.csv.util.{CompressionCodecs, ParserLibs, TextFile, TypeCast}
 
 /**
  * Provides access to CSV data from pure SQL statements (i.e. for users of the
  * JDBC server).
  */
 class DefaultSource
-  extends RelationProvider with SchemaRelationProvider with CreatableRelationProvider {
+  extends RelationProvider
+  with SchemaRelationProvider
+  with CreatableRelationProvider {
 
   private def checkPath(parameters: Map[String, String]): String = {
     parameters.getOrElse("path", sys.error("'path' must be specified for CSV data."))
@@ -54,7 +56,9 @@ class DefaultSource
     val delimiter = TypeCast.toChar(parameters.getOrElse("delimiter", ","))
 
     val quote = parameters.getOrElse("quote", "\"")
-    val quoteChar = if (quote.length == 1) {
+    val quoteChar: Character = if (quote == null) {
+      null
+    } else if (quote.length == 1) {
       quote.charAt(0)
     } else {
       throw new Exception("Quotation cannot be more than one character.")
@@ -95,7 +99,7 @@ class DefaultSource
       false
     } else if (ignoreLeadingWhiteSpace == "true") {
       if (!ParserLibs.isUnivocityLib(parserLib)) {
-        throw new Exception("Ignore whitesspace supported for Univocity parser only")
+        throw new Exception("Ignore white space supported for Univocity parser only")
       }
       true
     } else {
@@ -106,7 +110,7 @@ class DefaultSource
       false
     } else if (ignoreTrailingWhiteSpace == "true") {
       if (!ParserLibs.isUnivocityLib(parserLib)) {
-        throw new Exception("Ignore whitespace supported for the Univocity parser only")
+        throw new Exception("Ignore white space supported for the Univocity parser only")
       }
       true
     } else {
@@ -132,6 +136,19 @@ class DefaultSource
     } else {
       throw new Exception("Infer schema flag can be true or false")
     }
+    val nullValue = parameters.getOrElse("nullValue", "")
+
+    val dateFormat = parameters.getOrElse("dateFormat", null)
+
+    val codec = parameters.getOrElse("codec", null)
+
+    val maxCharsPerColStr = parameters.getOrElse("maxCharsPerCol", "100000")
+    val maxCharsPerCol = try {
+      maxCharsPerColStr.toInt
+    } catch {
+      case e: Exception => throw new Exception("maxCharsPerCol must be a valid integer")
+    }
+
 
     CsvRelation(
       () => TextFile.withCharset(sqlContext.sparkContext, path, charset),
@@ -147,7 +164,11 @@ class DefaultSource
       ignoreTrailingWhiteSpaceFlag,
       treatEmptyValuesAsNullsFlag,
       schema,
-      inferSchemaFlag)(sqlContext)
+      inferSchemaFlag,
+      codec,
+      nullValue,
+      dateFormat,
+      maxCharsPerCol)(sqlContext)
   }
 
   override def createRelation(
@@ -174,7 +195,8 @@ class DefaultSource
     }
     if (doSave) {
       // Only save data when the save mode is not ignore.
-      data.saveAsCsvFile(path, parameters)
+      val codecClass = CompressionCodecs.getCodecClass(parameters.getOrElse("codec", null))
+      data.saveAsCsvFile(path, parameters, codecClass)
     }
 
     createRelation(sqlContext, parameters, data.schema)
