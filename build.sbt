@@ -1,20 +1,26 @@
 name := "spark-csv"
 
-version := "1.5.0"
+version := "2.0.0"
 
 organization := "com.databricks"
 
-scalaVersion := "2.10.5"
+scalaVersion := "2.11.8"
 
 spName := "databricks/spark-csv"
 
 crossScalaVersions := Seq("2.10.5", "2.11.7")
 
-sparkVersion := "1.6.0"
+sparkVersion := "2.0.0"
 
 val testSparkVersion = settingKey[String]("The version of Spark to test against.")
 
 testSparkVersion := sys.props.get("spark.testVersion").getOrElse(sparkVersion.value)
+
+scalacOptions := Seq(
+  "-target:jvm-1.8",
+  "-deprecation",
+  "-feature"
+)
 
 sparkComponents := Seq("core", "sql")
 
@@ -42,13 +48,13 @@ spAppendScalaVersion := true
 
 spIncludeMaven := true
 
-publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (version.value.endsWith("SNAPSHOT"))
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
+//publishTo := {
+//  val nexus = "https://oss.sonatype.org/"
+//  if (version.value.endsWith("SNAPSHOT"))
+//    Some("snapshots" at nexus + "content/repositories/snapshots")
+//  else
+//    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+//}
 
 pomExtra := (
   <url>https://github.com/databricks/spark-csv</url>
@@ -89,7 +95,7 @@ import com.typesafe.tools.mima.plugin.MimaKeys.previousArtifact
 import com.typesafe.tools.mima.plugin.MimaPlugin.mimaDefaultSettings
 
 mimaDefaultSettings ++ Seq(
-  previousArtifact := Some("com.databricks" %% "spark-csv" % "1.2.0"),
+//  previousArtifact := Some("com.databricks" %% "spark-csv" % "1.2.0"),
   binaryIssueFilters ++= Seq(
     // These classes are not intended to be public interfaces:
     ProblemFilters.excludePackage("com.databricks.spark.csv.CsvRelation"),

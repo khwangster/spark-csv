@@ -162,7 +162,7 @@ private[csv] object InferSchema {
       FloatType,
       DoubleType,
       TimestampType,
-      DecimalType.Unlimited)
+      new DecimalType(DecimalType.MAX_PRECISION, DecimalType.MAX_SCALE))
 
   /**
    * Copied from internal Spark api

@@ -226,8 +226,8 @@ case class CsvRelation protected[spark] (
     } else {
       val firstRow = if (ParserLibs.isUnivocityLib(parserLib)) {
         val escapeVal = if (escape == null) '\\' else escape.charValue()
-        val commentChar: Char = if (comment == null) '\0' else comment
-        val quoteChar: Char = if (quote == null) '\0' else quote
+        val commentChar: Char = if (comment == null) '\u0000' else comment
+        val quoteChar: Char = if (quote == null) '\u0000' else quote
         new LineCsvReader(
           fieldSep = delimiter,
           quote = quoteChar,
@@ -283,8 +283,8 @@ case class CsvRelation protected[spark] (
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) => {
         val escapeVal = if (escape == null) '\\' else escape.charValue()
-        val commentChar: Char = if (comment == null) '\0' else comment
-        val quoteChar: Char = if (quote == null) '\0' else quote
+        val commentChar: Char = if (comment == null) '\u0000' else comment
+        val quoteChar: Char = if (quote == null) '\u0000' else quote
 
         new BulkCsvReader(iter, split,
           headers = header, fieldSep = delimiter,
