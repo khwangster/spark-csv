@@ -54,8 +54,8 @@ JIRA_PASSWORD = os.environ.get("JIRA_PASSWORD", "")
 GITHUB_OAUTH_KEY = os.environ.get("GITHUB_OAUTH_KEY")
 
 
-GITHUB_BASE = "https://github.com/databricks/spark-csv/pull"
-GITHUB_API_BASE = "https://api.github.com/repos/databricks/spark-csv"
+GITHUB_BASE = "https://github.com/truex/spark-csv/pull"
+GITHUB_API_BASE = "https://api.github.com/repos/truex/spark-csv"
 # Prefix added to temporary branches
 BRANCH_PREFIX = "PR_TOOL"
 

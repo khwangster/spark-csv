@@ -4,8 +4,8 @@ __NOTE: This functionality has been inlined in Apache Spark 2.x. This package is
 
 A library for parsing and querying CSV data with Apache Spark, for Spark SQL and DataFrames.
 
-[![Build Status](https://travis-ci.org/databricks/spark-csv.svg?branch=master)](https://travis-ci.org/databricks/spark-csv)
-[![codecov.io](http://codecov.io/github/databricks/spark-csv/coverage.svg?branch=master)](http://codecov.io/github/databricks/spark-csv?branch=master)
+[![Build Status](https://travis-ci.org/truex/spark-csv.svg?branch=master)](https://travis-ci.org/truex/spark-csv)
+[![codecov.io](http://codecov.io/github/truex/spark-csv/coverage.svg?branch=master)](http://codecov.io/github/truex/spark-csv?branch=master)
 
 ## Requirements
 
@@ -16,13 +16,13 @@ You can link against this library in your program at the following coordinates:
 
 ### Scala 2.10
 ```
-groupId: com.databricks
+groupId: com.truex
 artifactId: spark-csv_2.10
 version: 1.5.0
 ```
 ### Scala 2.11
 ```
-groupId: com.databricks
+groupId: com.truex
 artifactId: spark-csv_2.11
 version: 1.5.0
 ```
@@ -32,12 +32,12 @@ This package can be added to  Spark using the `--packages` command line option. 
 
 ### Spark compiled with Scala 2.11
 ```
-$SPARK_HOME/bin/spark-shell --packages com.databricks:spark-csv_2.11:1.5.0
+$SPARK_HOME/bin/spark-shell --packages com.truex:spark-csv_2.11:1.5.0
 ```
 
 ### Spark compiled with Scala 2.10
 ```
-$SPARK_HOME/bin/spark-shell --packages com.databricks:spark-csv_2.10:1.5.0
+$SPARK_HOME/bin/spark-shell --packages com.truex:spark-csv_2.10:1.5.0
 ```
 
 ## Features
@@ -71,10 +71,10 @@ The package also supports saving simple (non-nested) DataFrame. When writing fil
 * `codec`: compression codec to use when saving to file. Should be the fully qualified name of a class implementing `org.apache.hadoop.io.compress.CompressionCodec` or one of case-insensitive shorten names (`bzip2`, `gzip`, `lz4`, and `snappy`). Defaults to no compression when a codec is not specified.
 * `quoteMode`: when to quote fields (`ALL`, `MINIMAL` (default), `NON_NUMERIC`, `NONE`), see [Quote Modes](https://commons.apache.org/proper/commons-csv/apidocs/org/apache/commons/csv/QuoteMode.html)
 
-These examples use a CSV file available for download [here](https://github.com/databricks/spark-csv/raw/master/src/test/resources/cars.csv):
+These examples use a CSV file available for download [here](https://github.com/truex/spark-csv/raw/master/src/test/resources/cars.csv):
 
 ```
-$ wget https://github.com/databricks/spark-csv/raw/master/src/test/resources/cars.csv
+$ wget https://github.com/truex/spark-csv/raw/master/src/test/resources/cars.csv
 ```
 
 ### SQL API
@@ -82,14 +82,14 @@ $ wget https://github.com/databricks/spark-csv/raw/master/src/test/resources/car
 CSV data source for Spark can infer data types:
 ```sql
 CREATE TABLE cars
-USING com.databricks.spark.csv
+USING com.truex.spark.csv
 OPTIONS (path "cars.csv", header "true", inferSchema "true")
 ```
 
 You can also specify column names and types in DDL.
 ```sql
 CREATE TABLE cars (yearMade double, carMake string, carModel string, comments string, blank string)
-USING com.databricks.spark.csv
+USING com.truex.spark.csv
 OPTIONS (path "cars.csv", header "true")
 ```
 
@@ -102,14 +102,14 @@ import org.apache.spark.sql.SQLContext
 
 val sqlContext = new SQLContext(sc)
 val df = sqlContext.read
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true") // Use first line of all files as header
     .option("inferSchema", "true") // Automatically infer data types
     .load("cars.csv")
 
 val selectedData = df.select("year", "model")
 selectedData.write
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .save("newcars.csv")
 ```
@@ -128,14 +128,14 @@ val customSchema = StructType(Array(
     StructField("blank", StringType, true)))
 
 val df = sqlContext.read
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true") // Use first line of all files as header
     .schema(customSchema)
     .load("cars.csv")
 
 val selectedData = df.select("year", "model")
 selectedData.write
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .save("newcars.csv")
 ```
@@ -146,14 +146,14 @@ import org.apache.spark.sql.SQLContext
 
 val sqlContext = new SQLContext(sc)
 val df = sqlContext.read
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true") // Use first line of all files as header
     .option("inferSchema", "true") // Automatically infer data types
     .load("cars.csv")
 
 val selectedData = df.select("year", "model")
 selectedData.write
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
     .save("newcars.csv.gz")
@@ -167,10 +167,10 @@ import org.apache.spark.sql.SQLContext
 
 val sqlContext = new SQLContext(sc)
 val df = sqlContext.load(
-    "com.databricks.spark.csv",
+    "com.truex.spark.csv",
     Map("path" -> "cars.csv", "header" -> "true", "inferSchema" -> "true"))
 val selectedData = df.select("year", "model")
-selectedData.save("newcars.csv", "com.databricks.spark.csv")
+selectedData.save("newcars.csv", "com.truex.spark.csv")
 ```
 
 You can manually specify the schema when reading data:
@@ -187,12 +187,12 @@ val customSchema = StructType(Array(
     StructField("blank", StringType, true)))
 
 val df = sqlContext.load(
-    "com.databricks.spark.csv",
+    "com.truex.spark.csv",
     schema = customSchema,
     Map("path" -> "cars.csv", "header" -> "true"))
 
 val selectedData = df.select("year", "model")
-selectedData.save("newcars.csv", "com.databricks.spark.csv")
+selectedData.save("newcars.csv", "com.truex.spark.csv")
 ```
 
 ### Java API
@@ -204,13 +204,13 @@ import org.apache.spark.sql.SQLContext
 
 SQLContext sqlContext = new SQLContext(sc);
 DataFrame df = sqlContext.read()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("inferSchema", "true")
     .option("header", "true")
     .load("cars.csv");
 
 df.select("year", "model").write()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .save("newcars.csv");
 ```
@@ -230,13 +230,13 @@ StructType customSchema = new StructType(new StructField[] {
 });
 
 DataFrame df = sqlContext.read()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .schema(customSchema)
     .option("header", "true")
     .load("cars.csv");
 
 df.select("year", "model").write()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .save("newcars.csv");
 ```
@@ -247,13 +247,13 @@ import org.apache.spark.sql.SQLContext
 
 SQLContext sqlContext = new SQLContext(sc);
 DataFrame df = sqlContext.read()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("inferSchema", "true")
     .option("header", "true")
     .load("cars.csv");
 
 df.select("year", "model").write()
-    .format("com.databricks.spark.csv")
+    .format("com.truex.spark.csv")
     .option("header", "true")
     .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
     .save("newcars.csv");
@@ -272,8 +272,8 @@ options.put("header", "true");
 options.put("path", "cars.csv");
 options.put("inferSchema", "true");
 
-DataFrame df = sqlContext.load("com.databricks.spark.csv", options);
-df.select("year", "model").save("newcars.csv", "com.databricks.spark.csv");
+DataFrame df = sqlContext.load("com.truex.spark.csv", options);
+df.select("year", "model").save("newcars.csv", "com.truex.spark.csv");
 ```
 
 You can manually specify schema:
@@ -294,8 +294,8 @@ HashMap<String, String> options = new HashMap<String, String>();
 options.put("header", "true");
 options.put("path", "cars.csv");
 
-DataFrame df = sqlContext.load("com.databricks.spark.csv", customSchema, options);
-df.select("year", "model").save("newcars.csv", "com.databricks.spark.csv");
+DataFrame df = sqlContext.load("com.truex.spark.csv", customSchema, options);
+df.select("year", "model").save("newcars.csv", "com.truex.spark.csv");
 ```
 
 You can save with compressed output:
@@ -310,14 +310,14 @@ options.put("header", "true");
 options.put("path", "cars.csv");
 options.put("inferSchema", "true");
 
-DataFrame df = sqlContext.load("com.databricks.spark.csv", options);
+DataFrame df = sqlContext.load("com.truex.spark.csv", options);
 
 HashMap<String, String> saveOptions = new HashMap<String, String>();
 saveOptions.put("header", "true");
 saveOptions.put("path", "newcars.csv");
 saveOptions.put("codec", "org.apache.hadoop.io.compress.GzipCodec");
 
-df.select("year", "model").save("com.databricks.spark.csv", SaveMode.Overwrite,
+df.select("year", "model").save("com.truex.spark.csv", SaveMode.Overwrite,
                                 saveOptions);
 ```
 
@@ -330,8 +330,8 @@ Automatically infer schema (data types), otherwise everything is assumed string:
 from pyspark.sql import SQLContext
 sqlContext = SQLContext(sc)
 
-df = sqlContext.read.format('com.databricks.spark.csv').options(header='true', inferschema='true').load('cars.csv')
-df.select('year', 'model').write.format('com.databricks.spark.csv').save('newcars.csv')
+df = sqlContext.read.format('com.truex.spark.csv').options(header='true', inferschema='true').load('cars.csv')
+df.select('year', 'model').write.format('com.truex.spark.csv').save('newcars.csv')
 ```
 
 You can manually specify schema:
@@ -348,12 +348,12 @@ customSchema = StructType([ \
     StructField("blank", StringType(), True)])
 
 df = sqlContext.read \
-    .format('com.databricks.spark.csv') \
+    .format('com.truex.spark.csv') \
     .options(header='true') \
     .load('cars.csv', schema = customSchema)
 
 df.select('year', 'model').write \
-    .format('com.databricks.spark.csv') \
+    .format('com.truex.spark.csv') \
     .save('newcars.csv')
 ```
 
@@ -362,8 +362,8 @@ You can save with compressed output:
 from pyspark.sql import SQLContext
 sqlContext = SQLContext(sc)
 
-df = sqlContext.read.format('com.databricks.spark.csv').options(header='true', inferschema='true').load('cars.csv')
-df.select('year', 'model').write.format('com.databricks.spark.csv').options(codec="org.apache.hadoop.io.compress.GzipCodec").save('newcars.csv')
+df = sqlContext.read.format('com.truex.spark.csv').options(header='true', inferschema='true').load('cars.csv')
+df.select('year', 'model').write.format('com.truex.spark.csv').options(codec="org.apache.hadoop.io.compress.GzipCodec").save('newcars.csv')
 ```
 
 __Spark 1.3:__
@@ -373,8 +373,8 @@ Automatically infer schema (data types), otherwise everything is assumed string:
 from pyspark.sql import SQLContext
 sqlContext = SQLContext(sc)
 
-df = sqlContext.load(source="com.databricks.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.databricks.spark.csv')
+df = sqlContext.load(source="com.truex.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
+df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv')
 ```
 
 You can manually specify schema:
@@ -390,8 +390,8 @@ customSchema = StructType([ \
     StructField("comment", StringType(), True), \
     StructField("blank", StringType(), True)])
 
-df = sqlContext.load(source="com.databricks.spark.csv", header = 'true', schema = customSchema, path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.databricks.spark.csv')
+df = sqlContext.load(source="com.truex.spark.csv", header = 'true', schema = customSchema, path = 'cars.csv')
+df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv')
 ```
 
 You can save with compressed output:
@@ -399,8 +399,8 @@ You can save with compressed output:
 from pyspark.sql import SQLContext
 sqlContext = SQLContext(sc)
 
-df = sqlContext.load(source="com.databricks.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.databricks.spark.csv', codec="org.apache.hadoop.io.compress.GzipCodec")
+df = sqlContext.load(source="com.truex.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
+df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv', codec="org.apache.hadoop.io.compress.GzipCodec")
 ```
 
 ### R API
@@ -410,19 +410,19 @@ Automatically infer schema (data types), otherwise everything is assumed string:
 ```R
 library(SparkR)
 
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.databricks:spark-csv_2.10:1.4.0" "sparkr-shell"')
+Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
 sqlContext <- sparkRSQL.init(sc)
 
-df <- read.df(sqlContext, "cars.csv", source = "com.databricks.spark.csv", inferSchema = "true")
+df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", inferSchema = "true")
 
-write.df(df, "newcars.csv", "com.databricks.spark.csv", "overwrite")
+write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite")
 ```
 
 You can manually specify schema:
 ```R
 library(SparkR)
 
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.databricks:spark-csv_2.10:1.4.0" "sparkr-shell"')
+Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
 sqlContext <- sparkRSQL.init(sc)
 customSchema <- structType(
     structField("year", "integer"),
@@ -431,21 +431,21 @@ customSchema <- structType(
     structField("comment", "string"),
     structField("blank", "string"))
 
-df <- read.df(sqlContext, "cars.csv", source = "com.databricks.spark.csv", schema = customSchema)
+df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", schema = customSchema)
 
-write.df(df, "newcars.csv", "com.databricks.spark.csv", "overwrite")
+write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite")
 ```
 
 You can save with compressed output:
 ```R
 library(SparkR)
 
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.databricks:spark-csv_2.10:1.4.0" "sparkr-shell"')
+Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
 sqlContext <- sparkRSQL.init(sc)
 
-df <- read.df(sqlContext, "cars.csv", source = "com.databricks.spark.csv", inferSchema = "true")
+df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", inferSchema = "true")
 
-write.df(df, "newcars.csv", "com.databricks.spark.csv", "overwrite", codec="org.apache.hadoop.io.compress.GzipCodec")
+write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite", codec="org.apache.hadoop.io.compress.GzipCodec")
 ```
 
 ## Building From Source

@@ -14,7 +14,7 @@
 * limitations under the License.
 */
 
-package com.databricks.spark.csv.readers
+package com.truex.spark.csv.readers
 
 import org.scalatest.FunSuite
 

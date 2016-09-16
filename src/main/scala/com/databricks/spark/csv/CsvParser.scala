@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.databricks.spark.csv
+package com.truex.spark.csv
 
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.types.StructType
-import com.databricks.spark.csv.util.{ParserLibs, ParseModes, TextFile}
+import com.truex.spark.csv.util.{ParserLibs, ParseModes, TextFile}
 
 /**
  * A collection of static functions for working with CSV files in Spark SQL

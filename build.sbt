@@ -2,11 +2,11 @@ name := "spark-csv"
 
 version := "2.0.0"
 
-organization := "com.databricks"
+organization := "com.truex"
 
 scalaVersion := "2.11.8"
 
-spName := "databricks/spark-csv"
+spName := "truex/spark-csv"
 
 crossScalaVersions := Seq("2.10.5", "2.11.7")
 
@@ -57,7 +57,7 @@ spIncludeMaven := true
 //}
 
 pomExtra := (
-  <url>https://github.com/databricks/spark-csv</url>
+  <url>https://github.com/truex/spark-csv</url>
   <licenses>
     <license>
       <name>Apache License, Version 2.0</name>
@@ -66,8 +66,8 @@ pomExtra := (
     </license>
   </licenses>
   <scm>
-    <url>git@github.com:databricks/spark-csv.git</url>
-    <connection>scm:git:git@github.com:databricks/spark-csv.git</connection>
+    <url>git@github.com:truex/spark-csv.git</url>
+    <connection>scm:git:git@github.com:truex/spark-csv.git</connection>
   </scm>
   <developers>
     <developer>
@@ -95,16 +95,16 @@ import com.typesafe.tools.mima.plugin.MimaKeys.previousArtifact
 import com.typesafe.tools.mima.plugin.MimaPlugin.mimaDefaultSettings
 
 mimaDefaultSettings ++ Seq(
-//  previousArtifact := Some("com.databricks" %% "spark-csv" % "1.2.0"),
+//  previousArtifact := Some("com.truex" %% "spark-csv" % "1.2.0"),
   binaryIssueFilters ++= Seq(
     // These classes are not intended to be public interfaces:
-    ProblemFilters.excludePackage("com.databricks.spark.csv.CsvRelation"),
-    ProblemFilters.excludePackage("com.databricks.spark.csv.util.InferSchema"),
-    ProblemFilters.excludePackage("com.databricks.spark.sql.readers"),
-    ProblemFilters.excludePackage("com.databricks.spark.csv.util.TypeCast"),
+    ProblemFilters.excludePackage("com.truex.spark.csv.CsvRelation"),
+    ProblemFilters.excludePackage("com.truex.spark.csv.util.InferSchema"),
+    ProblemFilters.excludePackage("com.truex.spark.sql.readers"),
+    ProblemFilters.excludePackage("com.truex.spark.csv.util.TypeCast"),
     // We allowed the private `CsvRelation` type to leak into the public method signature:
     ProblemFilters.exclude[IncompatibleResultTypeProblem](
-      "com.databricks.spark.csv.DefaultSource.createRelation")
+      "com.truex.spark.csv.DefaultSource.createRelation")
   )
 )
 
