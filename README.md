@@ -1,30 +1,19 @@
-# CSV Data Source for Apache Spark 1.x
-
-__NOTE: This functionality has been inlined in Apache Spark 2.x. This package is in maintenance mode and we only accept critical bug fixes.__
+# CSV Data Source for Apache Spark 2.0
 
 A library for parsing and querying CSV data with Apache Spark, for Spark SQL and DataFrames.
 
-[![Build Status](https://travis-ci.org/truex/spark-csv.svg?branch=master)](https://travis-ci.org/truex/spark-csv)
-[![codecov.io](http://codecov.io/github/truex/spark-csv/coverage.svg?branch=master)](http://codecov.io/github/truex/spark-csv?branch=master)
-
 ## Requirements
 
-This library requires Spark 1.3+
+This library requires Spark 2
 
 ## Linking
 You can link against this library in your program at the following coordinates:
 
-### Scala 2.10
-```
-groupId: com.truex
-artifactId: spark-csv_2.10
-version: 1.5.0
-```
 ### Scala 2.11
 ```
 groupId: com.truex
 artifactId: spark-csv_2.11
-version: 1.5.0
+version: 2.0.0
 ```
 
 ## Using with Spark shell
@@ -33,11 +22,6 @@ This package can be added to  Spark using the `--packages` command line option. 
 ### Spark compiled with Scala 2.11
 ```
 $SPARK_HOME/bin/spark-shell --packages com.truex:spark-csv_2.11:1.5.0
-```
-
-### Spark compiled with Scala 2.10
-```
-$SPARK_HOME/bin/spark-shell --packages com.truex:spark-csv_2.10:1.5.0
 ```
 
 ## Features
@@ -94,7 +78,7 @@ OPTIONS (path "cars.csv", header "true")
 ```
 
 ### Scala API
-__Spark 1.4+:__
+__Spark 2+:__
 
 Automatically infer schema (data types), otherwise everything is assumed string:
 ```scala
@@ -193,259 +177,6 @@ val df = sqlContext.load(
 
 val selectedData = df.select("year", "model")
 selectedData.save("newcars.csv", "com.truex.spark.csv")
-```
-
-### Java API
-__Spark 1.4+:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```java
-import org.apache.spark.sql.SQLContext
-
-SQLContext sqlContext = new SQLContext(sc);
-DataFrame df = sqlContext.read()
-    .format("com.truex.spark.csv")
-    .option("inferSchema", "true")
-    .option("header", "true")
-    .load("cars.csv");
-
-df.select("year", "model").write()
-    .format("com.truex.spark.csv")
-    .option("header", "true")
-    .save("newcars.csv");
-```
-
-You can manually specify schema:
-```java
-import org.apache.spark.sql.SQLContext;
-import org.apache.spark.sql.types.*;
-
-SQLContext sqlContext = new SQLContext(sc);
-StructType customSchema = new StructType(new StructField[] {
-    new StructField("year", DataTypes.IntegerType, true, Metadata.empty()),
-    new StructField("make", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("model", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("comment", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("blank", DataTypes.StringType, true, Metadata.empty())
-});
-
-DataFrame df = sqlContext.read()
-    .format("com.truex.spark.csv")
-    .schema(customSchema)
-    .option("header", "true")
-    .load("cars.csv");
-
-df.select("year", "model").write()
-    .format("com.truex.spark.csv")
-    .option("header", "true")
-    .save("newcars.csv");
-```
-
-You can save with compressed output:
-```java
-import org.apache.spark.sql.SQLContext
-
-SQLContext sqlContext = new SQLContext(sc);
-DataFrame df = sqlContext.read()
-    .format("com.truex.spark.csv")
-    .option("inferSchema", "true")
-    .option("header", "true")
-    .load("cars.csv");
-
-df.select("year", "model").write()
-    .format("com.truex.spark.csv")
-    .option("header", "true")
-    .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
-    .save("newcars.csv");
-```
-
-__Spark 1.3:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```java
-import org.apache.spark.sql.SQLContext
-
-SQLContext sqlContext = new SQLContext(sc);
-
-HashMap<String, String> options = new HashMap<String, String>();
-options.put("header", "true");
-options.put("path", "cars.csv");
-options.put("inferSchema", "true");
-
-DataFrame df = sqlContext.load("com.truex.spark.csv", options);
-df.select("year", "model").save("newcars.csv", "com.truex.spark.csv");
-```
-
-You can manually specify schema:
-```java
-import org.apache.spark.sql.SQLContext;
-import org.apache.spark.sql.types.*;
-
-SQLContext sqlContext = new SQLContext(sc);
-StructType customSchema = new StructType(new StructField[] {
-    new StructField("year", DataTypes.IntegerType, true, Metadata.empty()),
-    new StructField("make", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("model", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("comment", DataTypes.StringType, true, Metadata.empty()),
-    new StructField("blank", DataTypes.StringType, true, Metadata.empty())
-});
-
-HashMap<String, String> options = new HashMap<String, String>();
-options.put("header", "true");
-options.put("path", "cars.csv");
-
-DataFrame df = sqlContext.load("com.truex.spark.csv", customSchema, options);
-df.select("year", "model").save("newcars.csv", "com.truex.spark.csv");
-```
-
-You can save with compressed output:
-```java
-import org.apache.spark.sql.SQLContext;
-import org.apache.spark.sql.SaveMode;
-
-SQLContext sqlContext = new SQLContext(sc);
-
-HashMap<String, String> options = new HashMap<String, String>();
-options.put("header", "true");
-options.put("path", "cars.csv");
-options.put("inferSchema", "true");
-
-DataFrame df = sqlContext.load("com.truex.spark.csv", options);
-
-HashMap<String, String> saveOptions = new HashMap<String, String>();
-saveOptions.put("header", "true");
-saveOptions.put("path", "newcars.csv");
-saveOptions.put("codec", "org.apache.hadoop.io.compress.GzipCodec");
-
-df.select("year", "model").save("com.truex.spark.csv", SaveMode.Overwrite,
-                                saveOptions);
-```
-
-### Python API
-
-__Spark 1.4+:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```python
-from pyspark.sql import SQLContext
-sqlContext = SQLContext(sc)
-
-df = sqlContext.read.format('com.truex.spark.csv').options(header='true', inferschema='true').load('cars.csv')
-df.select('year', 'model').write.format('com.truex.spark.csv').save('newcars.csv')
-```
-
-You can manually specify schema:
-```python
-from pyspark.sql import SQLContext
-from pyspark.sql.types import *
-
-sqlContext = SQLContext(sc)
-customSchema = StructType([ \
-    StructField("year", IntegerType(), True), \
-    StructField("make", StringType(), True), \
-    StructField("model", StringType(), True), \
-    StructField("comment", StringType(), True), \
-    StructField("blank", StringType(), True)])
-
-df = sqlContext.read \
-    .format('com.truex.spark.csv') \
-    .options(header='true') \
-    .load('cars.csv', schema = customSchema)
-
-df.select('year', 'model').write \
-    .format('com.truex.spark.csv') \
-    .save('newcars.csv')
-```
-
-You can save with compressed output:
-```python
-from pyspark.sql import SQLContext
-sqlContext = SQLContext(sc)
-
-df = sqlContext.read.format('com.truex.spark.csv').options(header='true', inferschema='true').load('cars.csv')
-df.select('year', 'model').write.format('com.truex.spark.csv').options(codec="org.apache.hadoop.io.compress.GzipCodec").save('newcars.csv')
-```
-
-__Spark 1.3:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```python
-from pyspark.sql import SQLContext
-sqlContext = SQLContext(sc)
-
-df = sqlContext.load(source="com.truex.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv')
-```
-
-You can manually specify schema:
-```python
-from pyspark.sql import SQLContext
-from pyspark.sql.types import *
-
-sqlContext = SQLContext(sc)
-customSchema = StructType([ \
-    StructField("year", IntegerType(), True), \
-    StructField("make", StringType(), True), \
-    StructField("model", StringType(), True), \
-    StructField("comment", StringType(), True), \
-    StructField("blank", StringType(), True)])
-
-df = sqlContext.load(source="com.truex.spark.csv", header = 'true', schema = customSchema, path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv')
-```
-
-You can save with compressed output:
-```python
-from pyspark.sql import SQLContext
-sqlContext = SQLContext(sc)
-
-df = sqlContext.load(source="com.truex.spark.csv", header = 'true', inferSchema = 'true', path = 'cars.csv')
-df.select('year', 'model').save('newcars.csv', 'com.truex.spark.csv', codec="org.apache.hadoop.io.compress.GzipCodec")
-```
-
-### R API
-__Spark 1.4+:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```R
-library(SparkR)
-
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
-sqlContext <- sparkRSQL.init(sc)
-
-df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", inferSchema = "true")
-
-write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite")
-```
-
-You can manually specify schema:
-```R
-library(SparkR)
-
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
-sqlContext <- sparkRSQL.init(sc)
-customSchema <- structType(
-    structField("year", "integer"),
-    structField("make", "string"),
-    structField("model", "string"),
-    structField("comment", "string"),
-    structField("blank", "string"))
-
-df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", schema = customSchema)
-
-write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite")
-```
-
-You can save with compressed output:
-```R
-library(SparkR)
-
-Sys.setenv('SPARKR_SUBMIT_ARGS'='"--packages" "com.truex:spark-csv_2.10:1.4.0" "sparkr-shell"')
-sqlContext <- sparkRSQL.init(sc)
-
-df <- read.df(sqlContext, "cars.csv", source = "com.truex.spark.csv", inferSchema = "true")
-
-write.df(df, "newcars.csv", "com.truex.spark.csv", "overwrite", codec="org.apache.hadoop.io.compress.GzipCodec")
 ```
 
 ## Building From Source
