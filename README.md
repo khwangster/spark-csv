@@ -143,41 +143,5 @@ selectedData.write
     .save("newcars.csv.gz")
 ```
 
-__Spark 1.3:__
-
-Automatically infer schema (data types), otherwise everything is assumed string:
-```scala
-import org.apache.spark.sql.SQLContext
-
-val sqlContext = new SQLContext(sc)
-val df = sqlContext.load(
-    "com.truex.spark.csv",
-    Map("path" -> "cars.csv", "header" -> "true", "inferSchema" -> "true"))
-val selectedData = df.select("year", "model")
-selectedData.save("newcars.csv", "com.truex.spark.csv")
-```
-
-You can manually specify the schema when reading data:
-```scala
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.types.{StructType, StructField, StringType, IntegerType};
-
-val sqlContext = new SQLContext(sc)
-val customSchema = StructType(Array(
-    StructField("year", IntegerType, true),
-    StructField("make", StringType, true),
-    StructField("model", StringType, true),
-    StructField("comment", StringType, true),
-    StructField("blank", StringType, true)))
-
-val df = sqlContext.load(
-    "com.truex.spark.csv",
-    schema = customSchema,
-    Map("path" -> "cars.csv", "header" -> "true"))
-
-val selectedData = df.select("year", "model")
-selectedData.save("newcars.csv", "com.truex.spark.csv")
-```
-
 ## Building From Source
 This library is built with [SBT](http://www.scala-sbt.org/0.13/docs/Command-Line-Reference.html), which is automatically downloaded by the included shell script. To build a JAR file simply run `sbt/sbt package` from the project root. The build configuration includes support for both Scala 2.10 and 2.11.
