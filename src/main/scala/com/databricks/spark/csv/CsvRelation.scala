@@ -50,11 +50,13 @@ case class CsvRelation protected[spark] (
     codec: String = null,
     nullValue: String = "",
     dateFormat: String = null,
+    timeFormat: String = null,
     maxCharsPerCol: Int = 100000)(@transient val sqlContext: SQLContext)
   extends BaseRelation with TableScan with PrunedScan with InsertableRelation {
 
   // Share date format object as it is expensive to parse date pattern.
   private val dateFormatter = if (dateFormat != null) new SimpleDateFormat(dateFormat) else null
+  private val timeFormatter = if (dateFormat != null) new SimpleDateFormat(timeFormat) else null
 
   private val logger = LoggerFactory.getLogger(CsvRelation.getClass)
 
@@ -103,6 +105,7 @@ case class CsvRelation protected[spark] (
 
   override def buildScan: RDD[Row] = {
     val simpleDateFormatter = dateFormatter
+    val simpleTimeFormatter = timeFormatter
     val schemaFields = schema.fields
     val rowArray = new Array[Any](schemaFields.length)
     tokenRdd(schemaFields.map(_.name)).flatMap { tokens =>
@@ -119,7 +122,7 @@ case class CsvRelation protected[spark] (
           while (index < schemaFields.length) {
             val field = schemaFields(index)
             rowArray(index) = TypeCast.castTo(tokens(index), field.dataType, field.nullable,
-              treatEmptyValuesAsNulls, nullValue, simpleDateFormatter)
+              treatEmptyValuesAsNulls, nullValue, simpleDateFormatter, simpleTimeFormatter)
             index = index + 1
           }
           Some(Row.fromSeq(rowArray))
@@ -150,6 +153,7 @@ case class CsvRelation protected[spark] (
    */
   override def buildScan(requiredColumns: Array[String]): RDD[Row] = {
     val simpleDateFormatter = dateFormatter
+    val simpleTimeFormatter = timeFormatter
     val schemaFields = schema.fields
     val requiredFields = StructType(requiredColumns.map(schema(_))).fields
     val shouldTableScan = schemaFields.deep == requiredFields.deep
@@ -199,7 +203,8 @@ case class CsvRelation protected[spark] (
                 field.nullable,
                 treatEmptyValuesAsNulls,
                 nullValue,
-                simpleDateFormatter
+                simpleDateFormatter,
+                simpleTimeFormatter
               )
               subIndex = subIndex + 1
             }

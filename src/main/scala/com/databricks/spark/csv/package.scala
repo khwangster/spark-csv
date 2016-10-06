@@ -103,8 +103,10 @@ package object csv {
       val delimiter = parameters.getOrElse("delimiter", ",")
       // Before this change the csvFormatter wrote dates like this:
       // "2014-11-15 06:31:10.0", so have that as the default.
-      val dateFormat = parameters.getOrElse("dateFormat", "yyyy-MM-dd HH:mm:ss.S")
+      val dateFormat = parameters.getOrElse("dateFormat", "yyyy-MM-dd")
+      val timeFormat = parameters.getOrElse("dateFormat", "yyyy-MM-dd HH:mm:ss.S")
       val dateFormatter: SimpleDateFormat = new SimpleDateFormat(dateFormat)
+      val timeFormatter: SimpleDateFormat = new SimpleDateFormat(timeFormat)
 
       val delimiterChar = if (delimiter.length == 1) {
         delimiter.charAt(0)
@@ -162,7 +164,7 @@ package object csv {
           if (timestamp == null) {
             nullValue
           } else {
-            dateFormatter.format(new Date(timestamp.asInstanceOf[Timestamp].getTime))
+            timeFormatter.format(new Date(timestamp.asInstanceOf[Timestamp].getTime))
           }
         }
         case DateType => (date: Any) => {

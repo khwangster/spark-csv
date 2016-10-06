@@ -42,6 +42,7 @@ class CsvParser extends Serializable {
   private var codec: String = null
   private var nullValue: String = ""
   private var dateFormat: String = null
+  private var timeFormat: String = null
   private var maxCharsPerCol: Int = 100000
 
   def withUseHeader(flag: Boolean): CsvParser = {
@@ -124,6 +125,11 @@ class CsvParser extends Serializable {
     this
   }
 
+  def withTimeFormat(timeFormat: String): CsvParser = {
+    this.timeFormat = timeFormat
+    this
+  }
+
   def withMaxCharsPerCol(maxCharsPerCol: Int): CsvParser = {
     this.maxCharsPerCol = maxCharsPerCol
     this
@@ -150,6 +156,7 @@ class CsvParser extends Serializable {
       codec,
       nullValue,
       dateFormat,
+      timeFormat,
       maxCharsPerCol)(sqlContext)
     sqlContext.baseRelationToDataFrame(relation)
   }
@@ -173,6 +180,7 @@ class CsvParser extends Serializable {
       codec,
       nullValue,
       dateFormat,
+      timeFormat,
       maxCharsPerCol)(sqlContext)
     sqlContext.baseRelationToDataFrame(relation)
   }

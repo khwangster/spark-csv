@@ -45,7 +45,9 @@ object TypeCast {
       nullable: Boolean = true,
       treatEmptyValuesAsNulls: Boolean = false,
       nullValue: String = "",
-      dateFormatter: SimpleDateFormat = null): Any = {
+      dateFormatter: SimpleDateFormat = null,
+      timeFormatter: SimpleDateFormat = null): Any = {
+    val nullValueIsNotEmpty = nullValue != ""
     if (datum == nullValue &&
       nullable ||
       (treatEmptyValuesAsNulls && datum == "")){
@@ -62,8 +64,8 @@ object TypeCast {
           .getOrElse(NumberFormat.getInstance(Locale.getDefault).parse(datum).doubleValue())
         case _: BooleanType => datum.toBoolean
         case _: DecimalType => new BigDecimal(datum.replaceAll(",", ""))
-        case _: TimestampType if dateFormatter != null =>
-          new Timestamp(dateFormatter.parse(datum).getTime)
+        case _: TimestampType if timeFormatter != null =>
+          new Timestamp(timeFormatter.parse(datum).getTime)
         case _: TimestampType => Timestamp.valueOf(datum)
         case _: DateType if dateFormatter != null =>
           new Date(dateFormatter.parse(datum).getTime)
