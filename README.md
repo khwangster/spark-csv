@@ -42,7 +42,8 @@ When reading files the API accepts several options:
 * `inferSchema`: automatically infers column types. It requires one extra pass over the data and is false by default
 * `comment`: skip lines beginning with this character. Default is `"#"`. Disable comments by setting this to `null`.
 * `nullValue`: specifies a string that indicates a null value, any fields matching this string will be set as nulls in the DataFrame
-* `dateFormat`: specifies a string that indicates the date format to use when reading dates or timestamps. Custom date formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html). This applies to both `DateType` and `TimestampType`. By default, it is `null` which means trying to parse times and date by `java.sql.Timestamp.valueOf()` and `java.sql.Date.valueOf()`.
+* `dateFormat`: specifies a string that indicates the date format to use when reading dates. Custom date formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html). This applies to `DateType`. By default, it is `null` which means trying to parse date by `java.sql.Date.valueOf()`.
+* `timeFormat`: specifies a string that indicates the date format to use when reading timestamps. Custom date formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html). This applies to `TimestampType`. By default, it is `null` which means trying to parse times by `java.sql.Timestamp.valueOf()`.
 
 The package also supports saving simple (non-nested) DataFrame. When writing files the API accepts several options:
 * `path`: location of files.
@@ -51,7 +52,9 @@ The package also supports saving simple (non-nested) DataFrame. When writing fil
 * `quote`: by default the quote character is `"`, but can be set to any character. This is written according to `quoteMode`.
 * `escape`: by default the escape character is `\`, but can be set to any character. Escaped quote characters are written.
 * `nullValue`: specifies a string that indicates a null value, nulls in the DataFrame will be written as this string.
-* `dateFormat`: specifies a string that indicates the date format to use writing dates or timestamps. Custom date formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html). This applies to both `DateType` and `TimestampType`. If no dateFormat is specified, then "yyyy-MM-dd HH:mm:ss.S".
+* `dateFormat`: specifies a string that indicates the date format to use writing dates. Custom date formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html). This applies to both `DateType`. If no dateFormat is specified, then "yyyy-MM-dd".
+* `timeFormat`: specifies a string that indicates the date format to use writing dates or timestamps. Custom time formats follow the formats at [`java.text.SimpleDateFormat`](https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html). This applies to both `TimestampType`. If no timeFormat is specified, then "yyyy-MM-dd HH:mm:ss.S".
+* `
 * `codec`: compression codec to use when saving to file. Should be the fully qualified name of a class implementing `org.apache.hadoop.io.compress.CompressionCodec` or one of case-insensitive shorten names (`bzip2`, `gzip`, `lz4`, and `snappy`). Defaults to no compression when a codec is not specified.
 * `quoteMode`: when to quote fields (`ALL`, `MINIMAL` (default), `NON_NUMERIC`, `NONE`), see [Quote Modes](https://commons.apache.org/proper/commons-csv/apidocs/org/apache/commons/csv/QuoteMode.html)
 

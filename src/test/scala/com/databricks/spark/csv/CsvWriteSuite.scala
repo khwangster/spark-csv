@@ -29,6 +29,9 @@ import scala.io.Source
 abstract class AbstractCsvWriteSuite extends FunSuite with BeforeAndAfterAll {
 
   val datesFile = "src/test/resources/dates.csv"
+  val defaultDatesFile = "src/test/resources/default_dates.csv"
+  val timesFile = "src/test/resources/times.csv"
+  val defaultTimesFile = "src/test/resources/default_times.csv"
   val tempEmptyDir = "target/test/empty/"
 
   def parserLib: String
@@ -50,9 +53,45 @@ abstract class AbstractCsvWriteSuite extends FunSuite with BeforeAndAfterAll {
 
   test("Save with default date format") {
     mkTempDir()
-    val dates = readDatesFromFile()
-    val copyFilePath = tempEmptyDir + "dates-copy.csv"
-    val retDataFile = tempEmptyDir + "dates-result.csv"
+
+    val customSchema = new StructType(Array(StructField("date", DateType, true)))
+    val dates = new CsvParser()
+      .withSchema(customSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("?")
+      .csvFile(sqlContext, defaultDatesFile)
+      .select("date")
+
+    val copyFilePath = tempEmptyDir + "default-dates-copy.csv"
+    val retDataFile = tempEmptyDir + "default-dates-result.csv"
+
+    // Write dataframe this way prior in spark 1.3 and before
+    // (later versions use dates.write.format)
+    dates.saveAsCsvFile(copyFilePath, Map("header" -> "false"))
+
+    FileUtil.fullyDelete(new File(retDataFile))
+    merge(copyFilePath, retDataFile)
+
+    val actualContents = readFile(retDataFile)
+
+    assert("2015-08-26\n2014-10-27\nnull\n2016-01-28"
+      === actualContents)
+  }
+
+  test("Save with default time format") {
+    mkTempDir()
+    val customSchema = new StructType(Array(StructField("date", TimestampType, true)))
+    val dates = new CsvParser()
+      .withSchema(customSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("?")
+      .csvFile(sqlContext, defaultTimesFile)
+      .select("date")
+
+    val copyFilePath = tempEmptyDir + "default-times-copy.csv"
+    val retDataFile = tempEmptyDir + "default-times-result.csv"
 
     // Write dataframe this way prior in spark 1.3 and before
     // (later versions use dates.write.format)
@@ -69,14 +108,50 @@ abstract class AbstractCsvWriteSuite extends FunSuite with BeforeAndAfterAll {
 
   test("Save with custom date format") {
     mkTempDir()
-    val dates = readDatesFromFile()
+    val customSchema = new StructType(Array(StructField("date", DateType, true)))
+    val dates = new CsvParser()
+      .withSchema(customSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("?")
+      .withDateFormat("dd/MM/yyyy")
+      .csvFile(sqlContext, datesFile)
+      .select("date")
 
     val copyFilePath = tempEmptyDir + "dates-copy.csv"
     val retDataFile = tempEmptyDir + "dates-result.csv"
 
     // Write dataframe this way prior in spark 1.3 and before
     dates.saveAsCsvFile(copyFilePath,
-      Map("header" -> "false", "dateFormat" -> "MM/dd/yyyy HH:mm:ss"))
+      Map("header" -> "false", "dateFormat" -> "MM/dd/yyyy"))
+
+    FileUtil.fullyDelete(new File(retDataFile))
+    merge(copyFilePath, retDataFile)
+
+    val actualContents = readFile(retDataFile)
+
+    // note that dates have been written with custom format
+    assert("08/26/2015\n10/27/2014\nnull\n01/28/2016" === actualContents)
+  }
+
+  test("Save with custom time format") {
+    mkTempDir()
+    val customSchema = new StructType(Array(StructField("date", TimestampType, true)))
+    val dates = new CsvParser()
+      .withSchema(customSchema)
+      .withUseHeader(true)
+      .withParserLib(parserLib)
+      .withNullValue("?")
+      .withTimeFormat("dd/MM/yyyy HH:mm")
+      .csvFile(sqlContext, timesFile)
+      .select("date")
+
+    val copyFilePath = tempEmptyDir + "dates-copy.csv"
+    val retDataFile = tempEmptyDir + "dates-result.csv"
+
+    // Write dataframe this way prior in spark 1.3 and before
+    dates.saveAsCsvFile(copyFilePath,
+      Map("header" -> "false", "timeFormat" -> "MM/dd/yyyy HH:mm:ss"))
 
     FileUtil.fullyDelete(new File(retDataFile))
     merge(copyFilePath, retDataFile)
@@ -91,18 +166,6 @@ abstract class AbstractCsvWriteSuite extends FunSuite with BeforeAndAfterAll {
   def mkTempDir(): Unit = {
     TestUtils.deleteRecursively(new File(tempEmptyDir))
     new File(tempEmptyDir).mkdirs()
-  }
-
-  def readDatesFromFile(): DataFrame = {
-    val customSchema = new StructType(Array(StructField("date", TimestampType, true)))
-    new CsvParser()
-      .withSchema(customSchema)
-      .withUseHeader(true)
-      .withParserLib(parserLib)
-      .withNullValue("?")
-      .withDateFormat("dd/MM/yyyy HH:mm")
-      .csvFile(sqlContext, datesFile)
-      .select("date")
   }
 
   def readFile(fname: String): String = {

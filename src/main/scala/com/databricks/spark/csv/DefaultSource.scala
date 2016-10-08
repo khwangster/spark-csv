@@ -139,6 +139,7 @@ class DefaultSource
     val nullValue = parameters.getOrElse("nullValue", "")
 
     val dateFormat = parameters.getOrElse("dateFormat", null)
+    val timeFormat = parameters.getOrElse("timeFormat", null)
 
     val codec = parameters.getOrElse("codec", null)
 
@@ -168,6 +169,7 @@ class DefaultSource
       codec,
       nullValue,
       dateFormat,
+      timeFormat,
       maxCharsPerCol)(sqlContext)
   }
 

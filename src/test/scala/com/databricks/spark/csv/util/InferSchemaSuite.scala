@@ -60,16 +60,31 @@ class InferSchemaSuite extends FunSuite {
   test("Timestamp field types are inferred correctly via custom data format"){
     val formatter = new SimpleDateFormat("yyyy-mm")
     assert(
-      InferSchema.inferField(TimestampType, "2015-08", dateFormatter = formatter) == TimestampType)
+      InferSchema.inferField(TimestampType, "2015-08", timeFormatter = formatter) == TimestampType)
     formatter.applyPattern("yyyy")
     assert(
-      InferSchema.inferField(TimestampType, "2015", dateFormatter = formatter) == TimestampType)
+      InferSchema.inferField(TimestampType, "2015", timeFormatter = formatter) == TimestampType)
   }
 
   test("Timestamp field types are inferred correctly from other types") {
     assert(InferSchema.inferField(IntegerType, "2015-08-20 14") == StringType)
     assert(InferSchema.inferField(DoubleType, "2015-08-20 14:10") == StringType)
     assert(InferSchema.inferField(LongType, "2015-08 14:49:00") == StringType)
+  }
+
+  test("Date field types are inferred correctly via custom data format"){
+    val formatter = new SimpleDateFormat("yyyy-mm")
+    assert(
+      InferSchema.inferField(DateType, "2015-08", timeFormatter = formatter) == DateType)
+    formatter.applyPattern("yyyy")
+    assert(
+      InferSchema.inferField(DateType, "2015", timeFormatter = formatter) == DateType)
+  }
+
+  test("Date field types are inferred correctly from other types") {
+    assert(InferSchema.inferField(IntegerType, "2015-08-20") == StringType)
+    assert(InferSchema.inferField(DoubleType, "2015-08-20") == StringType)
+    assert(InferSchema.inferField(LongType, "2015-08") == StringType)
   }
 
   test("Merging Nulltypes should yeild Nulltype.") {

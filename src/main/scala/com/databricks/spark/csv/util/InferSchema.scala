@@ -36,10 +36,11 @@ private[csv] object InferSchema {
       tokenRdd: RDD[Array[String]],
       header: Array[String],
       nullValue: String = "",
-      dateFormatter: SimpleDateFormat = null): StructType = {
+      dateFormatter: SimpleDateFormat = null,
+      timeFormatter: SimpleDateFormat = null): StructType = {
     val startType: Array[DataType] = Array.fill[DataType](header.length)(NullType)
     val rootTypes: Array[DataType] = tokenRdd.aggregate(startType)(
-      inferRowType(nullValue, dateFormatter),
+      inferRowType(nullValue, dateFormatter, timeFormatter),
       mergeRowTypes)
 
     val structFields = header.zip(rootTypes).map { case (thisHeader, rootType) =>
@@ -53,11 +54,11 @@ private[csv] object InferSchema {
     StructType(structFields)
   }
 
-  private def inferRowType(nullValue: String, dateFormatter: SimpleDateFormat)
+  private def inferRowType(nullValue: String, dateFormatter: SimpleDateFormat, timeFormatter: SimpleDateFormat)
   (rowSoFar: Array[DataType], next: Array[String]): Array[DataType] = {
     var i = 0
     while (i < math.min(rowSoFar.length, next.length)) {  // May have columns on right missing.
-      rowSoFar(i) = inferField(rowSoFar(i), next(i), nullValue, dateFormatter)
+      rowSoFar(i) = inferField(rowSoFar(i), next(i), nullValue, dateFormatter, timeFormatter)
       i+=1
     }
     rowSoFar
@@ -78,7 +79,8 @@ private[csv] object InferSchema {
   private[csv] def inferField(typeSoFar: DataType,
       field: String,
       nullValue: String = "",
-      dateFormatter: SimpleDateFormat = null): DataType = {
+      dateFormatter: SimpleDateFormat = null,
+      timeFormatter: SimpleDateFormat = null): DataType = {
     def tryParseInteger(field: String): DataType = if ((allCatch opt field.toInt).isDefined) {
       IntegerType
     } else {
@@ -100,10 +102,28 @@ private[csv] object InferSchema {
     }
 
     def tryParseTimestamp(field: String): DataType = {
-      if (dateFormatter != null) {
+      if (timeFormatter != null) {
         // This case infers a custom `dataFormat` is set.
-        if ((allCatch opt dateFormatter.parse(field)).isDefined){
+        if ((allCatch opt timeFormatter.parse(field)).isDefined){
           TimestampType
+        } else {
+          tryParseBoolean(field)
+        }
+      } else {
+        // We keep this for backwords competibility.
+        if ((allCatch opt Timestamp.valueOf(field)).isDefined) {
+          TimestampType
+        } else {
+          tryParseBoolean(field)
+        }
+      }
+    }
+
+    def tryParseDate(field: String): DataType = {
+      if (timeFormatter != null) {
+        // This case infers a custom `dataFormat` is set.
+        if ((allCatch opt timeFormatter.parse(field)).isDefined){
+          DateType
         } else {
           tryParseBoolean(field)
         }
@@ -141,6 +161,7 @@ private[csv] object InferSchema {
         case LongType => tryParseLong(field)
         case DoubleType => tryParseDouble(field)
         case TimestampType => tryParseTimestamp(field)
+        case DateType => tryParseDate(field)
         case BooleanType => tryParseBoolean(field)
         case StringType => StringType
         case other: DataType =>
