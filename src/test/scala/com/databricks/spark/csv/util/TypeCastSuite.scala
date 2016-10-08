@@ -29,7 +29,7 @@ class TypeCastSuite extends FunSuite {
   test("Can parse decimal type values") {
     val stringValues = Seq("10.05", "1,000.01", "158,058,049.001")
     val decimalValues = Seq(10.05, 1000.01, 158058049.001)
-    val decimalType = new DecimalType(None)
+    val decimalType = new DecimalType(DecimalType.MAX_PRECISION, DecimalType.MAX_SCALE)
 
     stringValues.zip(decimalValues).foreach { case (strVal, decimalVal) =>
       assert(TypeCast.castTo(strVal, decimalType) === new BigDecimal(decimalVal.toString))
@@ -92,13 +92,14 @@ class TypeCastSuite extends FunSuite {
     assert(TypeCast.castTo(timestamp, TimestampType) == Timestamp.valueOf(timestamp))
     assert(TypeCast.castTo("2015-01-01", DateType) == Date.valueOf("2015-01-01"))
 
-    val dateFormatter = new SimpleDateFormat("dd/MM/yyyy hh:mm")
+    val dateFormatter = new SimpleDateFormat("dd/MM/yyyy")
+    val timeFormatter = new SimpleDateFormat("dd/MM/yyyy hh:mm")
     val customTimestamp = "31/01/2015 00:00"
     // `SimpleDateFormat.parse` returns `java.util.Date`. This needs to be converted
     // to `java.sql.Date`
-    val expectedDate = new Date(dateFormatter.parse("31/01/2015 00:00").getTime)
+    val expectedDate = new Date(dateFormatter.parse("31/01/2015").getTime)
     val expectedTimestamp = new Timestamp(expectedDate.getTime)
-    assert(TypeCast.castTo(customTimestamp, TimestampType, dateFormatter = dateFormatter)
+    assert(TypeCast.castTo(customTimestamp, TimestampType, timeFormatter = timeFormatter)
       == expectedTimestamp)
     assert(TypeCast.castTo(customTimestamp, DateType, dateFormatter = dateFormatter) ==
       expectedDate)

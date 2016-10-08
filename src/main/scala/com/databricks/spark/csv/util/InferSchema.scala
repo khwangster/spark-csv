@@ -119,6 +119,24 @@ private[csv] object InferSchema {
       }
     }
 
+    def tryParseDate(field: String): DataType = {
+      if (timeFormatter != null) {
+        // This case infers a custom `dataFormat` is set.
+        if ((allCatch opt timeFormatter.parse(field)).isDefined){
+          DateType
+        } else {
+          tryParseBoolean(field)
+        }
+      } else {
+        // We keep this for backwords competibility.
+        if ((allCatch opt Timestamp.valueOf(field)).isDefined) {
+          TimestampType
+        } else {
+          tryParseBoolean(field)
+        }
+      }
+    }
+
     def tryParseBoolean(field: String): DataType = {
       if ((allCatch opt field.toBoolean).isDefined) {
         BooleanType
@@ -143,6 +161,7 @@ private[csv] object InferSchema {
         case LongType => tryParseLong(field)
         case DoubleType => tryParseDouble(field)
         case TimestampType => tryParseTimestamp(field)
+        case DateType => tryParseDate(field)
         case BooleanType => tryParseBoolean(field)
         case StringType => StringType
         case other: DataType =>

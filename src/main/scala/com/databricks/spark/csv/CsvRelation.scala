@@ -56,7 +56,7 @@ case class CsvRelation protected[spark] (
 
   // Share date format object as it is expensive to parse date pattern.
   private val dateFormatter = if (dateFormat != null) new SimpleDateFormat(dateFormat) else null
-  private val timeFormatter = if (dateFormat != null) new SimpleDateFormat(timeFormat) else null
+  private val timeFormatter = if (timeFormat != null) new SimpleDateFormat(timeFormat) else null
 
   private val logger = LoggerFactory.getLogger(CsvRelation.getClass)
 
