@@ -1,6 +1,6 @@
 name := "spark-csv"
 
-version := "2.0.2"
+version := "2.0.3"
 
 organization := "com.truex"
 
@@ -28,7 +28,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "2.2.+" % "provided",
   "org.apache.spark" %% "spark-sql" % "2.2.+" % "provided",
   "org.apache.commons" % "commons-csv" % "1.1",
-  "com.univocity" % "univocity-parsers" % "1.5.1",
+  "com.univocity" % "univocity-parsers" % "2.6.+",
   "org.slf4j" % "slf4j-api" % "1.7.5" % "provided",
   "org.scalatest" %% "scalatest" % "2.2.1" % "test",
   "com.novocode" % "junit-interface" % "0.9" % "test"
