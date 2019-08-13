@@ -4,11 +4,11 @@ version := "2.0.3"
 
 organization := "com.truex"
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.11.12"
 
 //spName := "truex/spark-csv"
 
-crossScalaVersions := Seq("2.10.5", "2.11.8")
+//crossScalaVersions := Seq("2.11.8")
 
 //sparkVersion := "2.2.+"
 
@@ -37,6 +37,26 @@ libraryDependencies ++= Seq(
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-library" % scalaVersion.value % "compile"
 )
+
+resolvers ++= Seq[Resolver](
+  "Will's bintray" at "https://dl.bintray.com/willb/maven/",
+  s3resolver.value("Releases resolver", s3("bin.truex.com/releases/")) withIvyPatterns,
+  s3resolver.value("Snapshots resolver", s3("bin.truex.com/snapshots/")) withIvyPatterns
+)
+
+publishMavenStyle := false
+
+s3overwrite := true
+
+publishTo := {
+  val prefix = // if (sys.env.get("TRAVIS_TAG").nonEmpty) {
+    "releases"
+//  } else {
+//    "snapshots"
+//  }
+
+  Some(s3resolver.value(s"true[x] S3 binary repo", s3(s"bin.truex.com/${prefix}/")) withIvyPatterns)
+}
 
 // This is necessary because of how we explicitly specify Spark dependencies
 // for tests rather than using the sbt-spark-package plugin to provide them.
